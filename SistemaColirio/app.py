@@ -5,18 +5,16 @@ from datetime import datetime
 
 st.set_page_config(page_title="Gestão de Colírios", layout="wide")
 
-# Conexão Banco
+# Conexão com o banco (criará o arquivo na nuvem temporariamente)
 conn = sqlite3.connect('clinica.db', check_same_thread=False)
 c = conn.cursor()
+
+# CRIAÇÃO AUTOMÁTICA DE TABELAS (Garante que o erro de 'no such table' não ocorra)
 c.execute('''CREATE TABLE IF NOT EXISTS pacientes (id_paciente TEXT PRIMARY KEY, nome TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS registros (
-                id INTEGER PRIMARY KEY, 
-                paciente_id TEXT, 
-                horario TIMESTAMP, 
-                usuario TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS registros (id INTEGER PRIMARY KEY, paciente_id TEXT, horario TIMESTAMP, usuario TEXT)''')
 conn.commit()
 
-# --- LOGIN SIMPLES ---
+# --- LOGIN ---
 if 'usuario' not in st.session_state:
     st.title("🔐 Login Profissional")
     user = st.text_input("Usuário (Nome/Enfermeiro):")
@@ -28,7 +26,7 @@ if 'usuario' not in st.session_state:
 
 st.title(f"💧 Painel de Dilatação - Operador: {st.session_state.usuario}")
 
-# --- IMPORTAÇÃO E RESET ---
+# --- CONFIGURAÇÕES ---
 with st.expander("📂 Configurações"):
     col1, col2 = st.columns(2)
     with col1:
@@ -38,6 +36,7 @@ with st.expander("📂 Configurações"):
             for _, row in df.iterrows():
                 c.execute("INSERT OR REPLACE INTO pacientes (id_paciente, nome) VALUES (?, ?)", (str(row['ID']), str(row['Nome'])))
             conn.commit()
+            st.success("Pacientes carregados!")
     with col2:
         if st.button("🔴 LIMPAR TUDO"):
             c.execute("DELETE FROM registros")
@@ -57,12 +56,11 @@ if codigo:
     else:
         st.error("Paciente não encontrado!")
 
-# --- PAINEL DETALHADO ---
+# --- PAINEL ---
 st.subheader("📊 Status Detalhado")
 pacientes = c.execute("SELECT id_paciente, nome FROM pacientes").fetchall()
 
 for pid, nome in pacientes:
-    # Busca histórico
     hist = c.execute("SELECT horario, usuario FROM registros WHERE paciente_id = ? ORDER BY horario DESC", (pid,)).fetchall()
     total = len(hist)
     
@@ -78,12 +76,7 @@ for pid, nome in pacientes:
     else:
         ultima_gota = "Nenhuma gota aplicada."
 
-    # Exibição visual
     with st.container(border=True):
         st.markdown(f"### {status_cor} {nome} (ID: {pid})")
         st.write(f"**Total de gotas:** {total} | **Status:** {texto}")
         st.write(f"*{ultima_gota}*")
-        if total > 0:
-            with st.expander("Ver histórico de aplicações"):
-                for h in hist:
-                    st.write(f"- {h[0]} aplicado por {h[1]}")
