@@ -73,4 +73,21 @@ with tabs[1]:
             st.rerun()
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-# 3.
+# 3. IMPORTAR
+with tabs[2]:
+    st.header("📥 Importação")
+    uploaded_file = st.file_uploader("CSV do HiperDoctor", type=["csv"])
+    if uploaded_file is not None:
+        if st.button("Processar Importação"):
+            df_import = pd.read_csv(uploaded_file)
+            
+            # Força o nome do usuário logado na coluna 'Usuario'
+            df_import['Usuario'] = st.session_state.usuario
+            
+            # Garante que as colunas do CSV coincidam com a ordem da planilha
+            # Supondo colunas: PacienteID, NomePaciente, QuantidadeGotas, Usuario
+            df_final = df_import[['PacienteID', 'NomePaciente', 'QuantidadeGotas', 'Usuario']]
+            
+            aba.append_rows(df_final.values.tolist())
+            st.success("Dados importados com seu nome de operador!")
+            st.rerun()
