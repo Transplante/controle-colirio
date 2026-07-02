@@ -6,7 +6,7 @@ from datetime import datetime
 # Configuração da página
 st.set_page_config(page_title="Gestão de Dilatação", layout="wide")
 
-# Conexão com Google Sheets
+# Conexão
 @st.cache_resource
 def get_connection():
     creds = st.secrets["gcp_service_account"]
@@ -17,47 +17,52 @@ def get_connection():
 def ler_dados():
     sh = get_connection()
     aba_reg = sh.worksheet("Registros")
+    # Retorna todos os registros da planilha
     return aba_reg.get_all_records(), aba_reg
 
 # Login
 if 'usuario' not in st.session_state:
-    st.subheader("🔐 Login Profissional")
-    user = st.text_input("Nome do Operador:")
-    if st.button("Entrar") and user:
+    st.sidebar.title("🔐 Login")
+    user = st.sidebar.text_input("Nome do Operador:")
+    if st.sidebar.button("Entrar") and user:
         st.session_state.usuario = user
         st.rerun()
     st.stop()
 
-# --- SIDEBAR (Configurações e Limpeza) ---
+# Sidebar
 with st.sidebar:
     st.title("💧 Painel de Dilatação")
     st.write(f"Operador: **{st.session_state.usuario}**")
     st.divider()
-    
-    dados, aba = ler_dados()
     if st.button("🧹 Limpar Histórico"):
+        _, aba = ler_dados()
         aba.delete_rows(2, aba.row_count)
         st.warning("Histórico apagado!")
         st.rerun()
 
-# --- DEFINIÇÃO DAS ABAS ---
+# Abas
 tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
 
+dados, aba = ler_dados()
 df = pd.DataFrame(dados)
 
-# 1. DASHBOARD
+# 1. DASHBOARD - Organizado e com contagem correta
 with tabs[0]:
     st.header("🏠 Monitoramento em Tempo Real")
     if not df.empty:
-        contagem = df['PacienteID'].value_counts()
-        for paciente_id, total_gotas in contagem.items():
-            # Lógica: 1-3 Vermelho, 4-8 Amarelo, 9+ Verde
-            if 1 <= total_gotas <= 3:
-                st.error(f"🔴 **Paciente: {paciente_id}** | Gota atual: {total_gotas}ª | Status: Não dilatado")
-            elif 4 <= total_gotas <= 8:
-                st.warning(f"🟡 **Paciente: {paciente_id}** | Gota atual: {total_gotas}ª | Status: Quase dilatado")
-            else:
-                st.success(f"🟢 **Paciente: {paciente_id}** | Gota atual: {total_gotas}ª | Status: Dilatado")
+        # Agrupa pelo ID e conta as gotas corretamente
+        contagem = df.groupby('PacienteID').size()
+        
+        cols = st.columns(3) # Cria 3 colunas para organizar os cartões
+        for i, (paciente_id, total_gotas) in enumerate(contagem.items()):
+            with cols[i % 3]:
+                # Lógica: 1-3 Vermelho, 4-8 Amarelo, 9+ Verde
+                if 1 <= total_gotas <= 3:
+                    st.error(f"🔴 **ID: {paciente_id}**\n\nGota: {total_gotas}ª de 10\n\nStatus: Não dilatado")
+                elif 4 <= total_gotas <= 8:
+                    st.warning(f"🟡 **ID: {paciente_id}**\n\nGota: {total_gotas}ª de 10\n\nStatus: Quase dilatado")
+                else:
+                    st.success(f"🟢 **ID: {paciente_id}**\n\nGota: {total_gotas}ª de 10\n\nStatus: Dilatado")
     else:
         st.info("Nenhum paciente registrado.")
 
