@@ -7,12 +7,18 @@ st.set_page_config(page_title="Gestão de Colírios", layout="wide")
 
 st.title("💧 Painel de Dilatação")
 
-# Função de conexão usando o ID da planilha
+# Função de conexão
 def get_connection():
     creds = st.secrets["gcp_service_account"]
     gc = gspread.service_account_from_dict(creds)
-    # Abre diretamente pelo ID único da planilha
     return gc.open_by_key("1A1SViUbrg8Kx9sH0bT2pKn9P59fcpWNHRDXeXiQQNIc")
+
+# Força o Streamlit a buscar dados novos da planilha constantemente
+@st.cache_data(ttl=1)
+def ler_dados():
+    sh = get_connection()
+    aba = sh.worksheet("Registros")
+    return aba.get_all_records(), aba
 
 if 'usuario' not in st.session_state:
     st.subheader("🔐 Login Profissional")
@@ -22,26 +28,31 @@ if 'usuario' not in st.session_state:
         st.rerun()
     st.stop()
 
+st.write(f"Conectado como: **{st.session_state.usuario}**")
+
 try:
-    sh = get_connection()
-    # Acessa a aba pelo nome exato que aparece na planilha
-    aba_registros = sh.worksheet("Registros")
+    dados, aba = ler_dados()
     
-    st.write(f"Conectado como: **{st.session_state.usuario}**")
-    
+    # --- REGISTRO ---
     codigo = st.text_input("ID do Paciente:")
     if st.button("Confirmar Aplicação"):
         if codigo:
-            aba_registros.append_row([codigo, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), st.session_state.usuario])
-            st.success("Registrado com sucesso!")
+            aba.append_row([codigo, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), st.session_state.usuario])
+            st.success("Registrado!")
             st.rerun()
     
+    # --- LIMPEZA DE HISTÓRICO ---
+    if st.button("🧹 Limpar Histórico Completo"):
+        # Limpa da linha 2 em diante (mantém cabeçalho na linha 1)
+        aba.delete_rows(2, aba.row_count)
+        st.warning("Histórico apagado!")
+        st.rerun()
+
     st.subheader("📊 Histórico")
-    dados = aba_registros.get_all_records()
     if dados:
-        st.dataframe(pd.DataFrame(dados))
+        st.dataframe(pd.DataFrame(dados), use_container_width=True)
     else:
         st.info("Planilha vazia.")
 
 except Exception as e:
-    st.error(f"Erro ao conectar: {e}")
+    st.error(f"Erro: {e}")
