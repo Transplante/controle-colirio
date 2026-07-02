@@ -28,12 +28,21 @@ if 'usuario' not in st.session_state:
         st.rerun()
     st.stop()
 
+# --- SIDEBAR (Configurações e Limpeza) ---
+with st.sidebar:
+    st.title("💧 Painel de Dilatação")
+    st.write(f"Operador: **{st.session_state.usuario}**")
+    st.divider()
+    
+    dados, aba = ler_dados()
+    if st.button("🧹 Limpar Histórico"):
+        aba.delete_rows(2, aba.row_count)
+        st.warning("Histórico apagado!")
+        st.rerun()
+
 # --- DEFINIÇÃO DAS ABAS ---
-# Isso deve vir antes de qualquer 'with tabs[0]:'
 tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
 
-# Carrega dados uma única vez para usar nas abas
-dados, aba = ler_dados()
 df = pd.DataFrame(dados)
 
 # 1. DASHBOARD
@@ -66,7 +75,7 @@ with tabs[1]:
 with tabs[2]:
     st.header("📥 Importação HiperDoctor")
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-    if uploaded_file and st.button("Processar"):
+    if uploaded_file and st.button("Processar Importação"):
         df_import = pd.read_csv(uploaded_file)
         aba.append_rows(df_import.values.tolist())
         st.rerun()
