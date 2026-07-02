@@ -7,10 +7,12 @@ st.set_page_config(page_title="Gestão de Colírios", layout="wide")
 
 st.title("💧 Painel de Dilatação")
 
+# Função de conexão usando o ID da planilha
 def get_connection():
     creds = st.secrets["gcp_service_account"]
     gc = gspread.service_account_from_dict(creds)
-    return gc.open("Gestão De Colírios")
+    # Abre diretamente pelo ID único da planilha
+    return gc.open_by_key("1A1SViUbrg8Kx9sH0bT2pKn9P59fcpWNHRDXeXiQQNIc")
 
 if 'usuario' not in st.session_state:
     st.subheader("🔐 Login Profissional")
@@ -22,29 +24,24 @@ if 'usuario' not in st.session_state:
 
 try:
     sh = get_connection()
-    # Listar nomes das abas para identificar qual é a correta
-    abas = [aba.title for aba in sh.worksheets()]
+    # Acessa a aba pelo nome exato que aparece na planilha
+    aba_registros = sh.worksheet("Registros")
     
-    # Tenta usar a aba 'Registros', se não existir, avisa qual nome o script enxergou
-    if "Registros" in abas:
-        aba_registros = sh.worksheet("Registros")
-        
-        st.subheader("Registrar Paciente")
-        codigo = st.text_input("Bipe/Digite ID do Paciente:")
-        
-        if st.button("Confirmar Aplicação"):
-            if codigo:
-                aba_registros.append_row([codigo, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), st.session_state.usuario])
-                st.success("Registrado!")
-                st.rerun()
-        
-        st.divider()
-        st.subheader("📊 Últimos Registros")
-        dados = aba_registros.get_all_records()
-        if dados:
-            st.dataframe(pd.DataFrame(dados))
+    st.write(f"Conectado como: **{st.session_state.usuario}**")
+    
+    codigo = st.text_input("ID do Paciente:")
+    if st.button("Confirmar Aplicação"):
+        if codigo:
+            aba_registros.append_row([codigo, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), st.session_state.usuario])
+            st.success("Registrado com sucesso!")
+            st.rerun()
+    
+    st.subheader("📊 Histórico")
+    dados = aba_registros.get_all_records()
+    if dados:
+        st.dataframe(pd.DataFrame(dados))
     else:
-        st.error(f"A aba 'Registros' não foi encontrada. Abas disponíveis na planilha: {abas}")
+        st.info("Planilha vazia.")
 
-except Exception as erro_msg:
-    st.error(f"Erro detalhado: {erro_msg}")
+except Exception as e:
+    st.error(f"Erro ao conectar: {e}")
