@@ -7,7 +7,6 @@ st.set_page_config(page_title="Gestão de Dilatação", layout="wide")
 
 st.title("💧 Painel de Dilatação")
 
-# Conexão
 @st.cache_resource
 def get_connection():
     creds = st.secrets["gcp_service_account"]
@@ -28,31 +27,36 @@ if 'usuario' not in st.session_state:
         st.rerun()
     st.stop()
 
-# Abas do sistema
 tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
 
 dados, aba = ler_dados()
 df = pd.DataFrame(dados)
 
-# 1. DASHBOARD: Lista dinâmica espelhada da planilha
+# 1. DASHBOARD: Lista dinâmica com lógica de Status
 with tabs[0]:
     st.header("🏠 Monitoramento em Tempo Real")
-    total_pacientes = df['PacienteID'].nunique() if not df.empty else 0
-    st.metric("👥 Pacientes atendidos hoje", total_pacientes)
-    st.divider()
-
+    
     if not df.empty:
-        # Percorre cada linha da planilha para criar um cartão no Dashboard
-        for index, row in df.iterrows():
-            status_text = f"Paciente: {row['PacienteID']} | Operador: {row['Usuario']} | Horário: {row['Horario']}"
+        # Conta quantas gotas (linhas) cada PacienteID tem
+        contagem = df['PacienteID'].value_counts()
+        
+        for paciente_id, total_gotas in contagem.items():
+            # Lógica de Status
+            if 1 <= total_gotas <= 3:
+                status = "🟢 Não está dilatado"
+                cor = st.info
+            elif 4 <= total_gotas <= 8:
+                status = "🟡 Quase dilatado"
+                cor = st.warning
+            else: # 9 ou mais
+                status = "🔴 Dilatado"
+                cor = st.error
             
-            # Aqui aplicamos a lógica visual (exemplo simples de cor)
-            # Você pode criar uma coluna 'Status' na sua planilha para controlar isso
-            st.info(f"🟢 {status_text}") 
+            cor(f"**Paciente: {paciente_id}** | Gotas: {total_gotas} | Status: {status}")
     else:
-        st.info("Nenhum paciente registrado no momento.")
+        st.info("Nenhum paciente registrado.")
 
-# 2. APLICAÇÕES: Onde você insere os dados que aparecem no Dashboard
+# 2. APLICAÇÕES
 with tabs[1]:
     st.header("💧 Registro de Gotas")
     codigo = st.text_input("ID do Paciente:")
