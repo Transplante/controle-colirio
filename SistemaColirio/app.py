@@ -16,8 +16,6 @@ def ler_dados():
     aba = sh.worksheet("Registros")
     data = aba.get_all_records()
     df = pd.DataFrame(data)
-    if not df.empty and 'QuantidadeGotas' in df.columns:
-        df['QuantidadeGotas'] = pd.to_numeric(df['QuantidadeGotas'], errors='coerce').fillna(0).astype(int)
     return df, aba
 
 # Login
@@ -29,17 +27,6 @@ if 'usuario' not in st.session_state:
         st.rerun()
     st.stop()
 
-# Sidebar
-with st.sidebar:
-    st.title("💧 Painel")
-    st.write(f"Operador: **{st.session_state.usuario}**")
-    if st.button("🧹 Limpar Histórico"):
-        sh = get_connection()
-        aba = sh.worksheet("Registros")
-        if aba.row_count > 1:
-            aba.delete_rows(2, aba.row_count)
-            st.rerun()
-
 # Abas
 tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
 df, aba = ler_dados()
@@ -48,11 +35,12 @@ df, aba = ler_dados()
 with tabs[0]:
     st.header("🏠 Monitoramento")
     if not df.empty:
+        # Força conversão para numérico para evitar erros
+        df['QuantidadeGotas'] = pd.to_numeric(df['QuantidadeGotas'], errors='coerce').fillna(0)
         cols = st.columns(3)
         for i, row in df.iterrows():
             with cols[i % 3]:
-                # Usa .get para evitar erro se a coluna não existir
-                gotas = int(pd.to_numeric(row.get('QuantidadeGotas', 0), errors='coerce'))
+                gotas = int(row['QuantidadeGotas'])
                 label = f"ID: {row.get('PacienteID', 'N/A')} | Gotas: {gotas}/10"
                 if gotas <= 3: st.error("🔴 " + label)
                 elif gotas <= 8: st.warning("🟡 " + label)
@@ -61,35 +49,31 @@ with tabs[0]:
 # 2. APLICAÇÕES
 with tabs[1]:
     st.header("Registrar Gota")
-    id_paciente = st.text_input("ID do Paciente:")
+    id_pac = st.text_input("ID do Paciente:")
     if st.button("Confirmar Aplicação"):
-        if id_paciente:
-            # Insere dados básicos
-            aba.append_row([id_paciente, "N/A", 1, st.session_state.usuario])
+        if id_pac_id:
+            aba.append_row([id_pac, "N/A", 1, st.session_state.usuario])
             st.rerun()
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-# 3. IMPORTAR (BLINDADO)
+# 3. IMPORTAR (Mapeamento manual)
 with tabs[2]:
-    st.header("📥 Importação")
-    uploaded_file = st.file_uploader("CSV do HiperDoctor", type=["csv"])
+    st.header("📥 Importação HiperDoctor")
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
     if uploaded_file is not None:
         if st.button("Processar Importação"):
             df_import = pd.read_csv(uploaded_file)
             
-            # CRIAÇÃO AUTOMÁTICA DE COLUNAS FALTANTES
-            colunas_necessarias = ['PacienteID', 'NomePaciente', 'QuantidadeGotas', 'Usuario']
-            for col in colunas_necessarias:
-                if col not in df_import.columns:
-                    df_import[col] = "" # Cria a coluna vazia se ela não existir no CSV
+            # --- MAPEAMENTO MANUAL ---
+            # Aqui ajustamos para pegar os dados do seu CSV. 
+            # Verifique se o seu CSV tem colunas chamadas 'ID' e 'Nome'
+            # Se forem outros nomes, altere aqui:
+            df_final = pd.DataFrame()
+            df_final['PacienteID'] = df_import.iloc[:, 0]  # Pega a 1ª coluna do CSV como ID
+            df_final['NomePaciente'] = df_import.iloc[:, 1] # Pega a 2ª coluna como Nome
+            df_final['QuantidadeGotas'] = 0                # Começa zerado
+            df_final['Usuario'] = st.session_state.usuario  # Registra o nome do logado
             
-            # Força o nome do usuário logado na coluna 'Usuario'
-            df_import['Usuario'] = st.session_state.usuario
-            
-            # Seleciona apenas as colunas certas e na ordem correta
-            df_final = df_import[colunas_necessarias]
-            
-            # Envia para a planilha
             aba.append_rows(df_final.values.tolist())
-            st.success("Dados importados com sucesso!")
+            st.success("Importação concluída com sucesso!")
             st.rerun()
