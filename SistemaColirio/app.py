@@ -1,89 +1,10 @@
-Skip to content
-Transplante
-controle-colirio
-Repository navigation
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security and quality
-Insights
-Settings
-Files
-Go to file
-t
-T
-.devcontainer
-SistemaColirio
-app.py
-clinica.db
-requirements.txt
-controle-colirio/SistemaColirio
-/
-app.py
-in
-main
-
-Edit
-
-Preview
-Indent mode
-
-Spaces
-Indent size
-
-4
-Line wrap mode
-
-No wrap
-Editing app.py file contents
-  1
-  2
-  3
-  4
-  5
-  6
-  7
-  8
-  9
- 10
- 11
- 12
- 13
- 14
- 15
- 16
- 17
- 18
- 19
- 20
- 21
- 22
- 23
- 24
- 25
- 26
- 27
- 28
- 29
- 30
- 31
- 32
- 33
- 34
- 35
- 36
 import streamlit as st
 import pandas as pd
 import gspread
 from datetime import datetime
 
-# Configuração da página
 st.set_page_config(page_title="Gestão de Dilatação", layout="wide")
 
-# Conexão com Google Sheets
 @st.cache_resource
 def get_connection():
     creds = st.secrets["gcp_service_account"]
@@ -95,7 +16,6 @@ def ler_dados():
     aba = sh.worksheet("Registros")
     data = aba.get_all_records()
     df = pd.DataFrame(data)
-    # Garante que a coluna de gotas seja numérica
     if not df.empty and 'QuantidadeGotas' in df.columns:
         df['QuantidadeGotas'] = pd.to_numeric(df['QuantidadeGotas'], errors='coerce').fillna(0).astype(int)
     return df, aba
@@ -111,5 +31,65 @@ if 'usuario' not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
- 
+    st.title("💧 Painel")
+    st.write(f"Operador: **{st.session_state.usuario}**")
+    if st.button("🧹 Limpar Histórico"):
+        sh = get_connection()
+        aba = sh.worksheet("Registros")
+        if aba.row_count > 1:
+            aba.delete_rows(2, aba.row_count)
+            st.rerun()
+
+# Abas
+tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
+df, aba = ler_dados()
+
+# 1. DASHBOARD
+with tabs[0]:
+    st.header("🏠 Monitoramento")
+    if not df.empty:
+        cols = st.columns(3)
+        for i, row in df.iterrows():
+            with cols[i % 3]:
+                # Usa .get para evitar erro se a coluna não existir
+                gotas = int(pd.to_numeric(row.get('QuantidadeGotas', 0), errors='coerce'))
+                label = f"ID: {row.get('PacienteID', 'N/A')} | Gotas: {gotas}/10"
+                if gotas <= 3: st.error("🔴 " + label)
+                elif gotas <= 8: st.warning("🟡 " + label)
+                else: st.success("🟢 " + label)
+
+# 2. APLICAÇÕES
+with tabs[1]:
+    st.header("Registrar Gota")
+    id_paciente = st.text_input("ID do Paciente:")
+    if st.button("Confirmar Aplicação"):
+        if id_paciente:
+            # Insere dados básicos
+            aba.append_row([id_paciente, "N/A", 1, st.session_state.usuario])
+            st.rerun()
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+# 3. IMPORTAR (BLINDADO)
+with tabs[2]:
+    st.header("📥 Importação")
+    uploaded_file = st.file_uploader("CSV do HiperDoctor", type=["csv"])
+    if uploaded_file is not None:
+        if st.button("Processar Importação"):
+            df_import = pd.read_csv(uploaded_file)
+            
+            # CRIAÇÃO AUTOMÁTICA DE COLUNAS FALTANTES
+            colunas_necessarias = ['PacienteID', 'NomePaciente', 'QuantidadeGotas', 'Usuario']
+            for col in colunas_necessarias:
+                if col not in df_import.columns:
+                    df_import[col] = "" # Cria a coluna vazia se ela não existir no CSV
+            
+            # Força o nome do usuário logado na coluna 'Usuario'
+            df_import['Usuario'] = st.session_state.usuario
+            
+            # Seleciona apenas as colunas certas e na ordem correta
+            df_final = df_import[colunas_necessarias]
+            
+            # Envia para a planilha
+            aba.append_rows(df_final.values.tolist())
+            st.success("Dados importados com sucesso!")
+            st.rerun()
