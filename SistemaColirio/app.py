@@ -12,11 +12,15 @@ def get_connection():
     return gc.open_by_key("1A1SViUbrg8Kx9sH0bT2pKn9P59fcpWNHRDXeXiQQNIc")
 
 def ler_dados():
-    sh = get_connection()
-    aba = sh.worksheet("Registros")
-    data = aba.get_all_records()
-    df = pd.DataFrame(data)
-    return df, aba
+    try:
+        sh = get_connection()
+        aba = sh.worksheet("Registros")
+        data = aba.get_all_records()
+        df = pd.DataFrame(data)
+        return df, aba
+    except Exception as e:
+        st.error(f"Erro ao ler planilha: {e}")
+        return pd.DataFrame(), None
 
 # Login
 if 'usuario' not in st.session_state:
@@ -27,6 +31,19 @@ if 'usuario' not in st.session_state:
         st.rerun()
     st.stop()
 
+# Sidebar com o botão de Limpar
+with st.sidebar:
+    st.title("💧 Painel")
+    st.write(f"Operador: **{st.session_state.usuario}**")
+    st.divider()
+    if st.button("🧹 Limpar Histórico"):
+        sh = get_connection()
+        aba = sh.worksheet("Registros")
+        # Deleta tudo exceto o cabeçalho (linha 1)
+        if aba.row_count > 1:
+            aba.delete_rows(2, aba.row_count)
+            st.rerun()
+
 # Abas
 tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
 df, aba = ler_dados()
@@ -34,8 +51,7 @@ df, aba = ler_dados()
 # 1. DASHBOARD
 with tabs[0]:
     st.header("🏠 Monitoramento")
-    if not df.empty:
-        # Força conversão para numérico para evitar erros
+    if not df.empty and 'QuantidadeGotas' in df.columns:
         df['QuantidadeGotas'] = pd.to_numeric(df['QuantidadeGotas'], errors='coerce').fillna(0)
         cols = st.columns(3)
         for i, row in df.iterrows():
@@ -45,18 +61,21 @@ with tabs[0]:
                 if gotas <= 3: st.error("🔴 " + label)
                 elif gotas <= 8: st.warning("🟡 " + label)
                 else: st.success("🟢 " + label)
+    else:
+        st.info("Nenhum dado encontrado.")
 
 # 2. APLICAÇÕES
 with tabs[1]:
     st.header("Registrar Gota")
     id_pac = st.text_input("ID do Paciente:")
     if st.button("Confirmar Aplicação"):
-        if id_pac_id:
+        if id_pac:
+            # Insere novo registro na planilha
             aba.append_row([id_pac, "N/A", 1, st.session_state.usuario])
             st.rerun()
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-# 3. IMPORTAR (Mapeamento manual)
+# 3. IMPORTAR
 with tabs[2]:
     st.header("📥 Importação HiperDoctor")
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
@@ -64,16 +83,13 @@ with tabs[2]:
         if st.button("Processar Importação"):
             df_import = pd.read_csv(uploaded_file)
             
-            # --- MAPEAMENTO MANUAL ---
-            # Aqui ajustamos para pegar os dados do seu CSV. 
-            # Verifique se o seu CSV tem colunas chamadas 'ID' e 'Nome'
-            # Se forem outros nomes, altere aqui:
+            # Cria DataFrame com as 4 colunas necessárias
             df_final = pd.DataFrame()
-            df_final['PacienteID'] = df_import.iloc[:, 0]  # Pega a 1ª coluna do CSV como ID
-            df_final['NomePaciente'] = df_import.iloc[:, 1] # Pega a 2ª coluna como Nome
-            df_final['QuantidadeGotas'] = 0                # Começa zerado
-            df_final['Usuario'] = st.session_state.usuario  # Registra o nome do logado
+            df_final['PacienteID'] = df_import.iloc[:, 0]
+            df_final['NomePaciente'] = df_import.iloc[:, 1]
+            df_final['QuantidadeGotas'] = 0
+            df_final['Usuario'] = st.session_state.usuario
             
             aba.append_rows(df_final.values.tolist())
-            st.success("Importação concluída com sucesso!")
+            st.success("Importação concluída!")
             st.rerun()
