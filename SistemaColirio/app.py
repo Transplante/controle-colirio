@@ -1,3 +1,80 @@
+Skip to content
+Transplante
+controle-colirio
+Repository navigation
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security and quality
+Insights
+Settings
+Files
+Go to file
+t
+T
+.devcontainer
+SistemaColirio
+app.py
+clinica.db
+requirements.txt
+controle-colirio/SistemaColirio
+/
+app.py
+in
+main
+
+Edit
+
+Preview
+Indent mode
+
+Spaces
+Indent size
+
+4
+Line wrap mode
+
+No wrap
+Editing app.py file contents
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
 import streamlit as st
 import pandas as pd
 import gspread
@@ -34,60 +111,5 @@ if 'usuario' not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-    st.title("💧 Painel")
-    st.write(f"Operador: **{st.session_state.usuario}**")
-    if st.button("🧹 Limpar Histórico"):
-        sh = get_connection()
-        aba = sh.worksheet("Registros")
-        if aba.row_count > 1:
-            aba.delete_rows(2, aba.row_count)
-            st.rerun()
-
-# Abas
-tabs = st.tabs(["🏠 Dashboard", "💧 Aplicações", "📥 Importar"])
-df, aba = ler_dados()
-
-# 1. DASHBOARD
-with tabs[0]:
-    st.header("🏠 Monitoramento")
-    if not df.empty:
-        cols = st.columns(3)
-        for i, row in df.iterrows():
-            with cols[i % 3]:
-                gotas = int(row['QuantidadeGotas'])
-                label = f"ID: {row.get('PacienteID', 'N/A')} | Gotas: {gotas}/10"
-                if gotas <= 3: st.error("🔴 " + label)
-                elif gotas <= 8: st.warning("🟡 " + label)
-                else: st.success("🟢 " + label)
-    else:
-        st.info("Nenhum dado encontrado.")
-
-# 2. APLICAÇÕES
-with tabs[1]:
-    st.header("Registrar Gota")
-    id_paciente = st.text_input("ID do Paciente:")
-    if st.button("Confirmar Aplicação"):
-        if id_paciente:
-            # Insere: ID, Nome Vazio (ou padrão), Quantidade (1), Usuário Logado
-            aba.append_row([id_paciente, "N/A", 1, st.session_state.usuario])
-            st.rerun()
-    st.dataframe(df, use_container_width=True, hide_index=True)
-
-# 3. IMPORTAR
-with tabs[2]:
-    st.header("📥 Importação")
-    uploaded_file = st.file_uploader("CSV do HiperDoctor", type=["csv"])
-    if uploaded_file is not None:
-        if st.button("Processar Importação"):
-            df_import = pd.read_csv(uploaded_file)
-            
-            # Força o nome do usuário logado na coluna 'Usuario'
-            df_import['Usuario'] = st.session_state.usuario
-            
-            # Garante que as colunas do CSV coincidam com a ordem da planilha
-            # Supondo colunas: PacienteID, NomePaciente, QuantidadeGotas, Usuario
-            df_final = df_import[['PacienteID', 'NomePaciente', 'QuantidadeGotas', 'Usuario']]
-            
-            aba.append_rows(df_final.values.tolist())
-            st.success("Dados importados com seu nome de operador!")
-            st.rerun()
+Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
+ 
